@@ -4,6 +4,7 @@ import bodyParser from "body-parser";
 import fs from "fs/promises";
 import { nanoid } from "nanoid";
 import path from "path";
+import bcrypt from "bcryptjs"; // keep a single top-level import
 
 const ROOT = process.cwd();
 const PUBLIC_DIR = path.resolve(ROOT, "public");
@@ -11,8 +12,6 @@ const DB_PATH = process.env.DB_PATH || path.resolve(ROOT, "db.json");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
-
 
 console.log("[MVP] ROOT:", ROOT);
 console.log("[MVP] PUBLIC_DIR:", PUBLIC_DIR);
@@ -20,30 +19,29 @@ console.log("[MVP] DB_PATH:", DB_PATH);
 
 /* ---------------- Helpers ---------------- */
 async function loadDB() {
-    try {
-      const raw = await fs.readFile(DB_PATH, "utf-8");
-      const db = JSON.parse(raw);
-  
-      // Normalize: ensure arrays exist
-      db.users = Array.isArray(db.users) ? db.users : [];
-      db.sessions = Array.isArray(db.sessions) ? db.sessions : [];
-      db.messages = Array.isArray(db.messages) ? db.messages : [];
-      db.resetTokens = Array.isArray(db.resetTokens) ? db.resetTokens : []; // NEW
-  
-      // Normalize: linkedIn -> linkedin
-      for (const u of db.users) {
-        if (u && u.linkedIn && !u.linkedin) u.linkedin = u.linkedIn;
-        if (u) delete u.linkedIn;
-      }
-      return db;
-    } catch {
-      const empty = { users: [], sessions: [], messages: [], resetTokens: [] };
-      await fs.writeFile(DB_PATH, JSON.stringify(empty, null, 2), "utf-8");
-      return empty;
+  try {
+    const raw = await fs.readFile(DB_PATH, "utf-8");
+    const db = JSON.parse(raw);
+
+    // Normalize: ensure arrays exist
+    db.users = Array.isArray(db.users) ? db.users : [];
+    db.sessions = Array.isArray(db.sessions) ? db.sessions : [];
+    db.messages = Array.isArray(db.messages) ? db.messages : [];
+    db.resetTokens = Array.isArray(db.resetTokens) ? db.resetTokens : [];
+
+    // Normalize: linkedIn -> linkedin
+    for (const u of db.users) {
+      if (u && u.linkedIn && !u.linkedin) u.linkedin = u.linkedIn;
+      if (u) delete u.linkedIn;
     }
+    return db;
+  } catch {
+    const empty = { users: [], sessions: [], messages: [], resetTokens: [] };
+    await fs.writeFile(DB_PATH, JSON.stringify(empty, null, 2), "utf-8");
+    return empty;
   }
-  
-  
+}
+
 async function saveDB(db) {
   await fs.writeFile(DB_PATH, JSON.stringify(db, null, 2), "utf-8");
 }
@@ -82,13 +80,7 @@ function authMiddleware(req, res, next) {
   next();
 }
 
-/* --------------- Matching (with scarcity) ---------------
-Base score:
-  shared skills + industry(+2) + commitment(+1)
-Scarcity rule (based on SEEKER 'a'):
-  if a.teamTech >= 2 → boost 'business' candidates (+3), mildly penalize 'technical' (-1)
-  if a.teamBiz  >= 2 → boost 'technical' candidates (+3), mildly penalize 'business'  (-1)
-*/
+/* --------------- Matching (with scarcity) --------------- */
 function matchScore(a, b) {
   const skillsA = parseSkills(a.skills);
   const skillsB = parseSkills(b.skills);
@@ -135,13 +127,11 @@ app.get("/", (req, res) => {
 app.get("/api/health", (req, res) => res.json({ ok: true }));
 
 /* ---------------- Auth & Signup ---------------- */
-// Sign-up (create or update) — now requires username + password
-import bcrypt from "bcryptjs"; // <-- add this at the top with other imports
-
+// Sign-up (create or update) — requires username + password
 app.post("/api/signup", async (req, res) => {
   const {
-    username,           // NEW
-    password,           // NEW
+    username,
+    password,
     name,
     email,
     skills,
@@ -151,11 +141,11 @@ app.post("/api/signup", async (req, res) => {
     teamTech,
     teamBiz,
     linkedin,
-    linkedIn
+    linkedIn,
   } = req.body || {};
 
   const clean = {
-    username: sanitizeString(username).toLowerCase(), // store lowercase for uniqueness
+    username: sanitizeString(username).toLowerCase(),
     name: sanitizeString(name),
     email: sanitizeString(email).toLowerCase(),
     skills: sanitizeString(skills),
@@ -164,25 +154,33 @@ app.post("/api/signup", async (req, res) => {
     commitment: sanitizeString(commitment),
     teamTech: toInt(teamTech),
     teamBiz: toInt(teamBiz),
-    linkedin: sanitizeString(linkedin || linkedIn || "")
+    linkedin: sanitizeString(linkedin || linkedIn || ""),
   };
 
   if (!clean.username || !password || !clean.name || !clean.email) {
-    return res.status(400).json({ error: "Username, password, name and email are required." });
+    return res
+      .status(400)
+      .json({ error: "Username, password, name and email are required." });
   }
-
-  // very light username validation
-  if (!/^[a-z0-9_\.]{3,30}$/.test(clean.username)) {
-    return res.status(400).json({ error: "Username must be 3–30 chars, letters/numbers/._ only." });
+  if (!/^[a-z0-9_.]{3,30}$/.test(clean.username)) {
+    return res
+      .status(400)
+      .json({
+        error: "Username must be 3–30 chars, letters/numbers/._ only.",
+      });
   }
 
   const db = await loadDB();
 
   // Uniqueness checks
-  const usernameTaken = db.users.some((u) => (u.username || "").toLowerCase() === clean.username);
+  const usernameTaken = db.users.some(
+    (u) => (u.username || "").toLowerCase() === clean.username
+  );
   if (usernameTaken) return res.status(409).json({ error: "Username already taken." });
 
-  const emailTaken = db.users.some((u) => (u.email || "").toLowerCase() === clean.email);
+  const emailTaken = db.users.some(
+    (u) => (u.email || "").toLowerCase() === clean.email
+  );
   if (emailTaken) return res.status(409).json({ error: "Email already in use." });
 
   const passwordHash = await bcrypt.hash(String(password), 10);
@@ -190,8 +188,8 @@ app.post("/api/signup", async (req, res) => {
   const user = {
     id: nanoid(),
     ...clean,
-    passwordHash,        // store hash, never plaintext
-    createdAt: Date.now()
+    passwordHash,
+    createdAt: Date.now(),
   };
   db.users.push(user);
 
@@ -203,7 +201,7 @@ app.post("/api/signup", async (req, res) => {
     ok: true,
     userId: user.id,
     token: session.id,
-    dashboardUrl: `/dashboard.html?token=${session.id}`
+    dashboardUrl: `/dashboard.html?token=${session.id}`,
   });
 });
 
@@ -219,10 +217,10 @@ app.post("/api/login", async (req, res) => {
   const idLower = identifier.toLowerCase();
   const db = await loadDB();
 
-  // find by email or username (case-insensitive)
   const user = db.users.find(
-    (u) => (u.email && u.email.toLowerCase() === idLower) ||
-           (u.username && u.username.toLowerCase() === idLower)
+    (u) =>
+      (u.email && u.email.toLowerCase() === idLower) ||
+      (u.username && u.username.toLowerCase() === idLower)
   );
 
   if (!user || !user.passwordHash) {
@@ -239,84 +237,97 @@ app.post("/api/login", async (req, res) => {
   res.json({
     ok: true,
     token: session.id,
-    dashboardUrl: `/dashboard.html?token=${session.id}`
+    dashboardUrl: `/dashboard.html?token=${session.id}`,
   });
 });
-// Forgot password: create a one-time reset token and "send" link via console
+
+/* ---------------- Password reset ---------------- */
+// Create reset token and "send" link (logged; return link in dev)
 app.post("/api/forgot-password", async (req, res) => {
-    const identifier = sanitizeString(req.body?.identifier || "").toLowerCase();
-    if (!identifier) return res.status(400).json({ ok: false, error: "Email or username is required." });
-  
-    const db = await loadDB();
-    const user = db.users.find(
-      (u) =>
-        (u.email && u.email.toLowerCase() === identifier) ||
-        (u.username && u.username.toLowerCase() === identifier)
-    );
-  
-    // Always respond OK (don’t leak which emails exist).
-    if (!user) return res.json({ ok: true, message: "If the account exists, a reset link was sent." });
-  
-    const token = nanoid();
-    const now = Date.now();
-    const expiresAt = now + 1000 * 60 * 30; // 30 minutes
-  
-    // Store token
-    db.resetTokens.push({
-      token,
-      userId: user.id,
-      email: user.email,
-      createdAt: now,
-      expiresAt
+  const identifier = sanitizeString(req.body?.identifier || "").toLowerCase();
+  if (!identifier)
+    return res
+      .status(400)
+      .json({ ok: false, error: "Email or username is required." });
+
+  const db = await loadDB();
+  const user = db.users.find(
+    (u) =>
+      (u.email && u.email.toLowerCase() === identifier) ||
+      (u.username && u.username.toLowerCase() === identifier)
+  );
+
+  // Always respond OK (don't leak whether account exists)
+  if (!user)
+    return res.json({
+      ok: true,
+      message: "If the account exists, a reset link was sent.",
     });
-    await saveDB(db);
-  
-    const resetUrl = `/reset.html?token=${encodeURIComponent(token)}`;
-    // "Send email" — for MVP, we log it. In production, call SendGrid/Resend etc.
-    console.log(`[Password Reset] Send to ${user.email}: http://localhost:3000${resetUrl}`);
-  
-    // For local dev, return the link so you can click it.
-    return res.json({ ok: true, message: "If the account exists, a reset link was sent.", resetUrl });
+
+  const token = nanoid();
+  const now = Date.now();
+  const expiresAt = now + 1000 * 60 * 30; // 30 minutes
+
+  db.resetTokens.push({
+    token,
+    userId: user.id,
+    email: user.email,
+    createdAt: now,
+    expiresAt,
   });
-  
-  // Reset password using the token
-  app.post("/api/reset-password", async (req, res) => {
-    const { token, password } = req.body || {};
-    if (!token || !password) return res.status(400).json({ ok: false, error: "Token and new password are required." });
-  
-    const db = await loadDB();
-    const entryIdx = db.resetTokens.findIndex((t) => t.token === token);
-    if (entryIdx === -1) return res.status(400).json({ ok: false, error: "Invalid or expired token." });
-  
-    const entry = db.resetTokens[entryIdx];
-    if (Date.now() > entry.expiresAt) {
-      // expire and remove
-      db.resetTokens.splice(entryIdx, 1);
-      await saveDB(db);
-      return res.status(400).json({ ok: false, error: "Invalid or expired token." });
-    }
-  
-    const user = db.users.find((u) => u.id === entry.userId);
-    if (!user) {
-      db.resetTokens.splice(entryIdx, 1);
-      await saveDB(db);
-      return res.status(400).json({ ok: false, error: "Invalid or expired token." });
-    }
-  
-    // Set new password
-    const bcrypt = (await import("bcryptjs")).default; // safe import if not already at top
-    user.passwordHash = await bcrypt.hash(String(password), 10);
-  
-    // Invalidate token
+  await saveDB(db);
+
+  // Build absolute URL (works on Render and locally)
+  const base =
+    process.env.PUBLIC_BASE_URL ||
+    (req.headers.origin || `https://${req.headers.host}` || "http://localhost:3000");
+  const resetUrl = `${base}/reset.html?token=${encodeURIComponent(token)}`;
+
+  console.log(`[Password Reset] Send to ${user.email}: ${resetUrl}`);
+
+  return res.json({
+    ok: true,
+    message: "If the account exists, a reset link was sent.",
+    resetUrl, // helpful in dev; harmless in prod
+  });
+});
+
+// Consume reset token and set new password
+app.post("/api/reset-password", async (req, res) => {
+  const { token, password } = req.body || {};
+  if (!token || !password)
+    return res
+      .status(400)
+      .json({ ok: false, error: "Token and new password are required." });
+
+  const db = await loadDB();
+  const entryIdx = db.resetTokens.findIndex((t) => t.token === token);
+  if (entryIdx === -1)
+    return res.status(400).json({ ok: false, error: "Invalid or expired token." });
+
+  const entry = db.resetTokens[entryIdx];
+  if (Date.now() > entry.expiresAt) {
     db.resetTokens.splice(entryIdx, 1);
     await saveDB(db);
-  
-    return res.json({ ok: true, message: "Password has been reset. You can now log in." });
-  });
-  
+    return res.status(400).json({ ok: false, error: "Invalid or expired token." });
+  }
 
+  const user = db.users.find((u) => u.id === entry.userId);
+  if (!user) {
+    db.resetTokens.splice(entryIdx, 1);
+    await saveDB(db);
+    return res.status(400).json({ ok: false, error: "Invalid or expired token." });
+  }
 
-// Current user
+  user.passwordHash = await bcrypt.hash(String(password), 10);
+
+  db.resetTokens.splice(entryIdx, 1);
+  await saveDB(db);
+
+  return res.json({ ok: true, message: "Password has been reset. You can now log in." });
+});
+
+/* ---------------- Me / Profile ---------------- */
 app.get("/api/me", authMiddleware, async (req, res) => {
   const db = await loadDB();
   const session = db.sessions.find((s) => s.id === req.token);
@@ -327,34 +338,41 @@ app.get("/api/me", authMiddleware, async (req, res) => {
 
   res.json({ ok: true, user });
 });
-// Update my profile (owner only)
+
+// Update own profile
 app.put("/api/profile", authMiddleware, async (req, res) => {
-    const db = await loadDB();
-  
-    const session = db.sessions.find((s) => s.id === req.token);
-    if (!session) return res.status(401).json({ error: "Invalid token." });
-  
-    const me = db.users.find((u) => u.email === session.email);
-    if (!me) return res.status(404).json({ error: "User not found." });
-  
-    const {
-      name, skills, role, industry, commitment, teamTech, teamBiz, linkedin
-    } = req.body || {};
-  
-    // Only update provided fields (MVP simplicity)
-    if (name !== undefined) me.name = sanitizeString(name);
-    if (skills !== undefined) me.skills = sanitizeString(skills);
-    if (role !== undefined) me.role = sanitizeString(role);
-    if (industry !== undefined) me.industry = sanitizeString(industry);
-    if (commitment !== undefined) me.commitment = sanitizeString(commitment);
-    if (teamTech !== undefined) me.teamTech = toInt(teamTech);
-    if (teamBiz !== undefined) me.teamBiz = toInt(teamBiz);
-    if (linkedin !== undefined) me.linkedin = sanitizeString(linkedin);
-  
-    await saveDB(db);
-    res.json({ ok: true, user: me });
-  });
-  
+  const db = await loadDB();
+
+  const session = db.sessions.find((s) => s.id === req.token);
+  if (!session) return res.status(401).json({ error: "Invalid token." });
+
+  const me = db.users.find((u) => u.email === session.email);
+  if (!me) return res.status(404).json({ error: "User not found." });
+
+  const {
+    name,
+    skills,
+    role,
+    industry,
+    commitment,
+    teamTech,
+    teamBiz,
+    linkedin,
+  } = req.body || {};
+
+  if (name !== undefined) me.name = sanitizeString(name);
+  if (skills !== undefined) me.skills = sanitizeString(skills);
+  if (role !== undefined) me.role = sanitizeString(role);
+  if (industry !== undefined) me.industry = sanitizeString(industry);
+  if (commitment !== undefined) me.commitment = sanitizeString(commitment);
+  if (teamTech !== undefined) me.teamTech = toInt(teamTech);
+  if (teamBiz !== undefined) me.teamBiz = toInt(teamBiz);
+  if (linkedin !== undefined) me.linkedin = sanitizeString(linkedin);
+
+  await saveDB(db);
+  res.json({ ok: true, user: me });
+});
+
 /* ---------------- Matches ---------------- */
 app.get("/api/matches", authMiddleware, async (req, res) => {
   const db = await loadDB();
@@ -382,7 +400,7 @@ app.get("/api/matches", authMiddleware, async (req, res) => {
   res.json({ ok: true, matches });
 });
 
-// Read user (safe fields)
+// Public user (safe fields; requires auth)
 app.get("/api/users/:id", authMiddleware, async (req, res) => {
   const db = await loadDB();
   const user = db.users.find((u) => u.id === req.params.id);
@@ -397,13 +415,12 @@ app.get("/api/users/:id", authMiddleware, async (req, res) => {
       role: user.role,
       industry: user.industry,
       commitment: user.commitment,
-      linkedin: user.linkedin || ""
+      linkedin: user.linkedin || "",
     },
   });
 });
 
 /* ---------------- Inbox APIs ---------------- */
-// Conversation list (summaries)
 app.get("/api/my-messages", authMiddleware, async (req, res) => {
   const db = await loadDB();
   const session = db.sessions.find((s) => s.id === req.token);
@@ -455,7 +472,6 @@ app.get("/api/my-messages", authMiddleware, async (req, res) => {
   res.json({ ok: true, conversations });
 });
 
-// Full thread with a specific user
 app.get("/api/thread/:withUserId", authMiddleware, async (req, res) => {
   const db = await loadDB();
   const session = db.sessions.find((s) => s.id === req.token);
@@ -489,7 +505,6 @@ app.get("/api/thread/:withUserId", authMiddleware, async (req, res) => {
   });
 });
 
-// Send message (mock)
 app.post("/api/message", authMiddleware, async (req, res) => {
   const { toUserId, subject, body } = req.body || {};
   const db = await loadDB();
@@ -520,9 +535,7 @@ app.post("/api/message", authMiddleware, async (req, res) => {
 app.post("/api/seed-demo", async (req, res) => {
   const db = await loadDB();
 
-  const alreadySeeded = db.users.some((u) =>
-    u.email.endsWith("@demo.local")
-  );
+  const alreadySeeded = db.users.some((u) => u.email.endsWith("@demo.local"));
   if (alreadySeeded)
     return res.json({ ok: true, message: "Demo users already exist." });
 
@@ -538,13 +551,11 @@ app.post("/api/seed-demo", async (req, res) => {
     { name: "Iris Park", email: "iris@demo.local", skills: "python, ai, inference", role: "Technical Founder", industry: "AI", commitment: "Full-time" },
     { name: "Jamal Reed", email: "jamal@demo.local", skills: "security, devops, aws", role: "Technical Founder", industry: "DevTools", commitment: "Nights & Weekends" },
     { name: "Kira Novak", email: "kira@demo.local", skills: "healthcare ops, bizdev", role: "Business/GT-M Founder", industry: "Health", commitment: "Exploring" },
-    { name: "Leo Rossi", email: "leo@demo.local", skills: "climate, supply chain", role: "Product Founder", industry: "Climate", commitment: "Full-time" }
+    { name: "Leo Rossi", email: "leo@demo.local", skills: "climate, supply chain", role: "Product Founder", industry: "Climate", commitment: "Full-time" },
   ];
 
   const now = Date.now();
-  for (const u of demo) {
-    db.users.push({ id: nanoid(), ...u, createdAt: now });
-  }
+  for (const u of demo) db.users.push({ id: nanoid(), ...u, createdAt: now });
   await saveDB(db);
 
   res.json({ ok: true, count: demo.length, message: "Seeded demo users." });
@@ -562,5 +573,5 @@ app.get("/api/stats", async (req, res) => {
 
 /* ---------------- Start ---------------- */
 app.listen(PORT, () => {
-  console.log(`MVP running at http://localhost:3000`);
+  console.log(`Server running on port ${PORT}`);
 });
