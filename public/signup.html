@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Sign Up — Co-Founder Match</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="brand">Blackwood</div>
+      <div class="nav">
+        <a href="/index.html">Home</a>
+        <a href="/login.html">Login</a>
+      </div>
+    </div>
+
+    <h2>Create your account</h2>
+    <p class="small">Pick a username and password, then fill your profile basics.</p>
+
+    <div id="msg"></div>
+
+    <div class="card">
+      <form id="signupForm">
+        <div class="grid two">
+          <div class="field">
+            <label for="username">Username</label>
+            <input id="username" class="input" placeholder="e.g., john_doe" required />
+            <div class="small">3–30 chars, letters/numbers/._ only.</div>
+          </div>
+          <div class="field">
+            <label for="password">Password</label>
+            <input id="password" type="password" class="input" required />
+          </div>
+        </div>
+
+        <div class="grid two">
+          <div class="field">
+            <label for="name">Full Name</label>
+            <input id="name" class="input" required />
+          </div>
+          <div class="field">
+            <label for="email">Email</label>
+            <input id="email" type="email" class="input" required />
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="linkedin">LinkedIn URL (optional)</label>
+          <input id="linkedin" class="input" placeholder="https://www.linkedin.com/in/your-handle" />
+        </div>
+
+        <div class="grid two">
+          <div class="field">
+            <label for="teamTech">How many technical teammates already on your team?</label>
+            <input id="teamTech" class="input" type="number" min="0" step="1" value="0" />
+          </div>
+          <div class="field">
+            <label for="teamBiz">How many business/GT-M teammates already on your team?</label>
+            <input id="teamBiz" class="input" type="number" min="0" step="1" value="0" />
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="skills">Skills (comma-separated)</label>
+          <input id="skills" class="input" placeholder="e.g., react, node, design, go-to-market" />
+        </div>
+
+        <div class="grid three">
+          <div class="field">
+            <label for="role">Desired Role</label>
+            <select id="role">
+              <option value="">Select…</option>
+              <option>Technical Founder</option>
+              <option>Product Founder</option>
+              <option>Business/GT-M Founder</option>
+              <option>Design Founder</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="industry">Startup Industry</label>
+            <select id="industry">
+              <option value="">Select…</option>
+              <option>AI</option>
+              <option>Fintech</option>
+              <option>Health</option>
+              <option>Consumer</option>
+              <option>DevTools</option>
+              <option>Climate</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="commitment">Commitment Level</label>
+            <select id="commitment">
+              <option value="">Select…</option>
+              <option>Exploring</option>
+              <option>Nights & Weekends</option>
+              <option>Full-time</option>
+            </select>
+          </div>
+        </div>
+
+        <button class="btn" type="submit">Create Account</button>
+      </form>
+    </div>
+
+    <div class="footer">© 2025 Blackwood</div>
+  </div>
+
+  <script>
+    const msg = document.getElementById('msg');
+    const form = document.getElementById('signupForm');
+
+    function show(text, ok=true) {
+      msg.innerHTML = '<div class="'+(ok?'notice':'error')+'">'+text+'</div>';
+    }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const payload = {
+        username: document.getElementById('username').value.trim(),
+        password: document.getElementById('password').value,
+        name: document.getElementById('name').value.trim(),
+        email: document.getElementById('email').value.trim(),
+        linkedin: document.getElementById('linkedin').value.trim(),
+        skills: document.getElementById('skills').value.trim(),
+        role: document.getElementById('role').value,
+        industry: document.getElementById('industry').value,
+        commitment: document.getElementById('commitment').value,
+        teamTech: document.getElementById('teamTech').value,
+        teamBiz: document.getElementById('teamBiz').value
+      };
+
+      try {
+        const res = await fetch('/api/signup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (!data.ok) throw new Error(data.error || 'Sign-up failed');
+
+        show('Success! Redirecting to your dashboard…');
+        setTimeout(() => { window.location.href = data.dashboardUrl; }, 1000);
+      } catch (err) {
+        show(err.message, false);
+      }
+    });
+  </script>
+</body>
+</html>

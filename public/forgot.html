@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Forgot Password — Co-Founder Match</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="brand">Co-Founder Match</div>
+      <div class="nav">
+        <a href="/">Home</a>
+        <a href="/login.html">Login</a>
+        <a href="/signup.html">Sign Up</a>
+      </div>
+    </div>
+
+    <h2>Forgot your password?</h2>
+    <p class="small">Enter your <strong>email or username</strong>. If it matches an account, we’ll send a password reset link.</p>
+
+    <div id="msg"></div>
+
+    <div class="card">
+      <form id="forgotForm">
+        <div class="field">
+          <label for="identifier">Email or Username</label>
+          <input id="identifier" class="input" required />
+        </div>
+        <button class="btn" type="submit">Send Reset Link</button>
+      </form>
+      <div class="small" id="devLink" style="margin-top:10px;"></div>
+    </div>
+
+    <div class="footer">© 2025 Co-Founder Match — MVP</div>
+  </div>
+
+  <script>
+    const msg = document.getElementById('msg');
+    const devLink = document.getElementById('devLink');
+    function show(text, ok=true) {
+      msg.innerHTML = '<div class="'+(ok?'notice':'error')+'">'+text+'</div>';
+    }
+
+    document.getElementById('forgotForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      devLink.textContent = '';
+      try {
+        const res = await fetch('/api/forgot-password', {
+          method: 'POST',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({ identifier: document.getElementById('identifier').value.trim() })
+        });
+        const data = await res.json();
+        if (!data.ok) throw new Error(data.error || 'Failed');
+        show('If the account exists, a reset link was sent to the email on file.');
+        if (data.resetUrl) {
+          devLink.innerHTML = `Dev helper: <a href="${data.resetUrl}">${data.resetUrl}</a>`;
+        }
+      } catch (err) {
+        show(err.message, false);
+      }
+    });
+  </script>
+</body>
+</html>

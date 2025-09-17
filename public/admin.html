@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Admin — Blackwood</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="brand">Blackwood — Admin</div>
+      <div class="nav">
+        <a href="/">Home</a>
+        <a href="/signup.html">Sign Up</a>
+        <a href="/login.html">Login</a>
+      </div>
+    </div>
+
+    <h2>Admin Tools</h2>
+    <div id="msg"></div>
+
+    <div class="card" style="margin-bottom:16px;">
+      <h3>Seed demo users</h3>
+      <p class="small">Add 12 realistic demo users so new testers immediately see matches.</p>
+      <button class="btn" id="seedBtn">Seed Demo Users</button>
+    </div>
+
+    <div class="card">
+      <h3>Stats</h3>
+      <p class="small">Quick look at users/messages/sessions.</p>
+      <button class="btn secondary" id="statsBtn">Refresh Stats</button>
+      <pre id="statsBox" class="small" style="margin-top:12px;"></pre>
+    </div>
+  </div>
+
+  <script>
+    const msg = document.getElementById('msg');
+    const statsBox = document.getElementById('statsBox');
+
+    function show(text, ok=true) {
+      msg.innerHTML = '<div class="'+(ok?'notice':'error')+'">'+text+'</div>';
+    }
+
+    document.getElementById('seedBtn').addEventListener('click', async () => {
+      try {
+        const res = await fetch('/api/seed-demo', { method: 'POST' });
+        const data = await res.json();
+        if (!data.ok) throw new Error(data.error || 'Failed');
+        show('Seeded: '+data.count+' users. '+data.message);
+      } catch (e) { show(e.message, false); }
+    });
+
+    document.getElementById('statsBtn').addEventListener('click', async () => {
+      try {
+        const res = await fetch('/api/stats');
+        const data = await res.json();
+        if (!data.ok) throw new Error(data.error || 'Failed');
+        statsBox.textContent = JSON.stringify(data, null, 2);
+      } catch (e) { show(e.message, false); }
+    });
+  </script>
+</body>
+</html>

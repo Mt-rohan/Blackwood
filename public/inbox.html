@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>DM — Blackwood</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="brand">Blackwood</div>
+      <div class="nav">
+        <a id="backDash" href="#">Back to Dashboard</a>
+      </div>
+    </div>
+
+    <div class="chat-layout">
+      <!-- Sidebar: conversations -->
+      <aside class="chat-sidebar card">
+        <div class="chat-sidebar-header">
+          <h3 style="margin:0">Messages</h3>
+          <div class="small" id="convCount"></div>
+        </div>
+        <div id="convList" class="chat-convs"></div>
+      </aside>
+
+      <!-- Main: thread -->
+      <main class="chat-main card">
+        <div class="chat-thread-header">
+          <div id="threadTitle" class="thread-title">Select a conversation</div>
+          <div id="threadMeta" class="small muted"></div>
+        </div>
+
+        <div id="threadBox" class="chat-thread"></div>
+
+        <form id="composer" class="chat-composer" autocomplete="off">
+          <input id="subject" class="input chat-subject" placeholder="Subject (optional)" />
+          <div class="chat-row">
+            <textarea id="body" rows="2" class="input chat-input" placeholder="Type a message… (Enter to send, Shift+Enter for newline)"></textarea>
+            <button class="btn" id="sendBtn" type="submit" disabled>Send</button>
+          </div>
+        </form>
+      </main>
+    </div>
+  </div>
+
+  <script>
+    const backDash = document.getElementById('backDash');
+    const convList = document.getElementById('convList');
+    const convCount = document.getElementById('convCount');
+    const threadTitle = document.getElementById('threadTitle');
+    const threadMeta = document.getElementById('threadMeta');
+    const threadBox = document.getElementById('threadBox');
+    const composer = document.getElementById('composer');
+    const bodyInput = document.getElementById('body');
+    const subjectInput = document.getElementById('subject');
+    const sendBtn = document.getElementById('sendBtn');
+
+    function token() {
+      const u = new URL(location.href);
+      return u.searchParams.get('token');
+    }
+    function api(path) {
+      const t = token();
+      const url = path.includes('?') ? (path + '&token=' + encodeURIComponent(t)) : (path + '?token=' + encodeURIComponent(t));
+      return fetch(url).then(r => r.json());
+    }
+    function apiPost(path, body) {
+      const t = token();
+      const url = path + '?token=' + encodeURIComponent(t);
+      return fetch(url, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body)}).then(r => r.json());
+    }
+    function fmt(ts) { return new Date(ts).toLocaleString(); }
+
+    let meId = null;
+    let currentOtherId = null;
+    let pollTimer = null;
+    let lastRenderedCount = 0;
+
+    function clearThreadUI(text="Select a conversation") {
+      threadTitle.textContent = text;
+      threadMeta.textContent = "";
+      threadBox.innerHTML = "";
+      composer.classList.add('disabled');
+      sendBtn.disabled = true;
+      subjectInput.value = "";
+      bodyInput.value = "";
+    }
+
+    function renderConversations(items) {
+      convList.innerHTML = '';
+      convCount.textContent = items.length ? `${items.length} conversations` : 'No conversations';
+      if (!items.length) return;
+
+      items.forEach(c => {
+        const btn = document.createElement('button');
+        btn.className = 'chat-conv';
+        btn.innerHTML = `
+          <div class="conv-name">${c.withUser.name}</div>
+          <div class="conv-last small">${(c.lastMessage.subject || 'No subject')} • ${new Date(c.lastMessage.createdAt).toLocaleDateString()}</div>
+        `;
+        btn.addEventListener('click', () => openThread(c.withUser.id));
+        convList.appendChild(btn);
+      });
+    }
+
+    function renderThread(data) {
+      meId = data.me.id;
+      threadTitle.textContent = data.other.name;
+      threadMeta.textContent = `${data.other.role || '—'} · ${data.other.industry || '—'}`;
+      threadBox.innerHTML = '';
+
+      if (!data.messages.length) {
+        const empty = document.createElement('div');
+        empty.className = 'small muted';
+        empty.style.padding = '6px 8px';
+        empty.textContent = 'No messages yet. Say hello!';
+        threadBox.appendChild(empty);
+      } else {
+        data.messages.forEach(m => addBubble(m, m.fromUserId === meId ? 'me' : 'them'));
+        threadBox.scrollTop = threadBox.scrollHeight;
+      }
+
+      lastRenderedCount = data.messages.length;
+      composer.classList.remove('disabled');
+      updateSendEnabled();
+    }
+
+    function addBubble(m, who) {
+      const wrap = document.createElement('div');
+      wrap.className = 'bubble ' + (who === 'me' ? 'me' : 'them');
+      wrap.innerHTML = `
+        ${m.subject ? `<div class="bubble-subject">${escapeHtml(m.subject)}</div>` : ''}
+        <div class="bubble-body">${escapeHtml(m.body)}</div>
+        <div class="bubble-meta">${who === 'me' ? 'You' : 'Them'} • ${fmt(m.createdAt)}</div>
+      `;
+      threadBox.appendChild(wrap);
+    }
+
+    function escapeHtml(str) {
+      return (str || '').replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s]));
+    }
+
+    async function openThread(otherId) {
+      currentOtherId = otherId;
+      // stop any previous polling first
+      if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+
+      const data = await api('/api/thread/' + encodeURIComponent(otherId));
+      if (!data.ok) { clearThreadUI('Error loading conversation'); return; }
+      renderThread(data);
+
+      // start lightweight polling (every 3s) to fetch new messages
+      pollTimer = setInterval(async () => {
+        const d = await api('/api/thread/' + encodeURIComponent(otherId));
+        if (d.ok && d.messages.length > lastRenderedCount) {
+          // append only the new ones
+          const newOnes = d.messages.slice(lastRenderedCount);
+          newOnes.forEach(m => addBubble(m, m.fromUserId === meId ? 'me' : 'them'));
+          lastRenderedCount = d.messages.length;
+          threadBox.scrollTop = threadBox.scrollHeight;
+        }
+      }, 3000);
+    }
+
+    function updateSendEnabled() {
+      const hasText = bodyInput.value.trim().length > 0;
+      sendBtn.disabled = !hasText || !currentOtherId || composer.classList.contains('disabled');
+    }
+
+    composer.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!currentOtherId) return;
+      const body = bodyInput.value.trim();
+      const subject = subjectInput.value.trim();
+      if (!body) return;
+
+      const res = await apiPost('/api/message', {
+        toUserId: currentOtherId,
+        subject: subject || '',
+        body
+      });
+      if (!res.ok) return;
+
+      // Optimistic append
+      const now = Date.now();
+      addBubble({ subject, body, createdAt: now, fromUserId: meId }, 'me');
+      lastRenderedCount += 1;
+      bodyInput.value = '';
+      updateSendEnabled();
+      threadBox.scrollTop = threadBox.scrollHeight;
+    });
+
+    // Enter to send, Shift+Enter for newline
+    bodyInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        composer.requestSubmit();
+      }
+    });
+    bodyInput.addEventListener('input', updateSendEnabled);
+    subjectInput.addEventListener('input', updateSendEnabled);
+
+    (async () => {
+      const t = token();
+      if (!t) { alert('Missing token. Open Inbox from your Dashboard.'); return; }
+      backDash.href = '/dashboard.html?token=' + encodeURIComponent(t);
+
+      // Load conversations list
+      const list = await api('/api/my-messages');
+      if (list.ok) {
+        renderConversations(list.conversations);
+        // Auto-open the most recent convo (optional)
+        if (list.conversations[0]) openThread(list.conversations[0].withUser.id);
+      } else {
+        renderConversations([]);
+      }
+    })();
+  </script>
+</body>
+</html>

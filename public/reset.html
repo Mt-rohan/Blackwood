@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Reset Password — Co-Founder Match</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="brand">Co-Founder Match</div>
+      <div class="nav">
+        <a href="/">Home</a>
+        <a href="/login.html">Login</a>
+      </div>
+    </div>
+
+    <h2>Reset your password</h2>
+    <p class="small">Choose a new password for your account.</p>
+
+    <div id="msg"></div>
+
+    <div class="card">
+      <form id="resetForm">
+        <div class="field">
+          <label for="password">New Password</label>
+          <input id="password" type="password" class="input" required />
+        </div>
+        <div class="field">
+          <label for="password2">Confirm Password</label>
+          <input id="password2" type="password" class="input" required />
+        </div>
+        <button class="btn" type="submit">Reset Password</button>
+      </form>
+    </div>
+
+    <div class="footer">© 2025 Co-Founder Match — MVP</div>
+  </div>
+
+  <script>
+    const msg = document.getElementById('msg');
+    function show(text, ok=true) {
+      msg.innerHTML = '<div class="'+(ok?'notice':'error')+'">'+text+'</div>';
+    }
+    function getToken() {
+      const u = new URL(location.href);
+      return u.searchParams.get('token');
+    }
+
+    document.getElementById('resetForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const p1 = document.getElementById('password').value;
+      const p2 = document.getElementById('password2').value;
+      if (p1 !== p2) { show('Passwords do not match.', false); return; }
+      const token = getToken();
+      if (!token) { show('Missing or invalid reset link.', false); return; }
+
+      try {
+        const res = await fetch('/api/reset-password', {
+          method: 'POST',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({ token, password: p1 })
+        });
+        const data = await res.json();
+        if (!data.ok) throw new Error(data.error || 'Reset failed');
+        show('Password reset successful! You can now log in.');
+        setTimeout(()=>{ window.location.href = '/login.html'; }, 1200);
+      } catch (err) {
+        show(err.message, false);
+      }
+    });
+  </script>
+</body>
+</html>

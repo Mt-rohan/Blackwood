@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Login — Blackwood</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="brand">Blackwood</div>
+      <div class="nav">
+        <a href="/">Home</a>
+        <a href="/signup.html">Sign Up</a>
+      </div>
+    </div>
+
+    <h2>Login</h2>
+    <p class="small">Use your <strong>email or username</strong> with your password.</p>
+
+    <div id="msg"></div>
+
+    <div class="card">
+      <form id="loginForm">
+        <div class="field">
+          <label for="identifier">Email or Username</label>
+          <input id="identifier" class="input" required />
+        </div>
+        <div class="field">
+          <label for="password">Password</label>
+          <input id="password" type="password" class="input" required />
+        </div>
+        <button class="btn" type="submit">Login</button>
+        <p class="small" style="margin-top:8px;">
+          <a href="/forgot.html">Forgot your password?</a>
+        </p>
+        
+      </form>
+    </div>
+  </div>
+
+  <script>
+    const msg = document.getElementById('msg');
+    function show(text, ok=true) {
+      msg.innerHTML = '<div class="'+(ok?'notice':'error')+'">'+text+'</div>';
+    }
+
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const payload = {
+        identifier: document.getElementById('identifier').value.trim(),
+        password: document.getElementById('password').value
+      };
+      try {
+        const res = await fetch('/api/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (!data.ok) throw new Error(data.error || 'Login failed');
+        show('Success! Redirecting…');
+        setTimeout(()=>{ window.location.href = data.dashboardUrl; }, 800);
+      } catch (err) {
+        show(err.message, false);
+      }
+    });
+  </script>
+</body>
+</html>

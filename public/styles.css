@@ -1,0 +1,312 @@
+/* ===============================
+   Founders — Old-Money Design System
+   Themes: sterling (default), albion, granite
+   Tip: set <html data-theme="albion"> to switch.
+   =============================== */
+
+/* ------- Theme Tokens ------- */
+:root {
+  /* sterling (deep navy + gold) */
+  --bg: #0b0f19;              /* page background */
+  --bg-grad: radial-gradient(100vw 70vh at 80% -10%, #0f1a2a, #0b0f19 50%, #080b12 85%);
+  --panel: #0f1624;           /* main container */
+  --card: #0d1420;            /* cards/surfaces */
+  --border: #1b2740;          /* separators */
+  --ink: #e8e6df;             /* primary text (warm off-white) */
+  --muted: #a7b0c2;           /* secondary text */
+  --link: #c7a86b;            /* gold */
+  --accent: #c6a667;          /* gold solid */
+  --accent-2: #2f7a5f;        /* deep emerald */
+  --danger: #cc5a5a;
+  --focus: #e9c97c99;         /* focus ring */
+
+  --radius: 14px;
+  --radius-lg: 18px;
+  --shadow-1: 0 14px 40px rgba(0,0,0,.35);
+  --shadow-2: 0 22px 70px rgba(0,0,0,.5);
+  --inner-hair: inset 0 1px 0 rgba(255,255,255,.04);
+}
+
+/* albion (forest + ivory) */
+html[data-theme="albion"] {
+  --bg: #0b100c;
+  --bg-grad: radial-gradient(100vw 70vh at 80% -10%, #0f1a13, #0b100c 50%, #070a07 85%);
+  --panel: #0e1410;
+  --card: #0c130e;
+  --border: #1a261f;
+  --ink: #ebe8e1;
+  --muted: #b8c2b9;
+  --link: #d8c89a;
+  --accent: #cbb980;   /* brass */
+  --accent-2: #2e6b56; /* pine */
+  --danger: #c16464;
+  --focus: #e6d6a299;
+}
+
+/* granite (charcoal + platinum) */
+html[data-theme="granite"] {
+  --bg: #0a0a0b;
+  --bg-grad: radial-gradient(100vw 70vh at 80% -10%, #141416, #0a0a0b 55%, #070708 85%);
+  --panel: #101012;
+  --card: #0d0d10;
+  --border: #1c1c21;
+  --ink: #e6e7eb;
+  --muted: #b5b7bf;
+  --link: #bfb7a1;
+  --accent: #b6ad97;   /* pewter */
+  --accent-2: #2f6f86; /* steel blue */
+  --danger: #cf6666;
+  --focus: #cfc7ae99;
+}
+
+/* ------- Base ------- */
+* { box-sizing: border-box; }
+html, body {
+  margin: 0; padding: 0;
+  background: var(--bg);
+  background-image: var(--bg-grad);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+body {
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Inter, "Helvetica Neue", Arial;
+  line-height: 1.45;
+}
+
+/* ------- Layout ------- */
+.container {
+  max-width: 980px;
+  margin: 42px auto;
+  padding: 26px;
+  background: linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,.01));
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-1), var(--inner-hair);
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 22px;
+}
+.brand {
+  font-weight: 700;
+  letter-spacing: .2px;
+  font-size: 18px;
+}
+.nav a {
+  color: var(--muted);
+  text-decoration: none;
+  margin-left: 16px;
+  transition: color .2s ease, opacity .2s ease;
+}
+.nav a:hover { color: var(--ink); }
+
+/* ------- Typography ------- */
+h1, h2, h3 {
+  margin: 10px 0;
+  line-height: 1.2;
+}
+h1 { font-size: 34px; }
+h2 { font-size: 22px; }
+h3 { font-size: 18px; }
+.small { font-size: 13px; color: var(--muted); }
+.muted { color: var(--muted); }
+
+/* ------- Sections ------- */
+.hero { padding: 36px 16px; text-align: center; }
+.hero h1 { margin-bottom: 8px; }
+.hero p { color: var(--muted); margin-top: 0; }
+
+/* ------- Grid ------- */
+.grid {
+  display: grid;
+  gap: 16px;
+}
+.grid.two   { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 920px) {
+  .grid.two, .grid.three { grid-template-columns: 1fr; }
+}
+
+/* ------- Surfaces ------- */
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  box-shadow: var(--inner-hair);
+}
+
+/* ------- Buttons & Links ------- */
+.btn {
+  appearance: none;
+  background: var(--accent);
+  color: #0b0f19;
+  border: 0;
+  padding: 10px 16px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: 700;
+  letter-spacing: .2px;
+  box-shadow: 0 10px 28px rgba(198,166,103,.25);
+  transition: transform .06s ease, filter .2s ease, box-shadow .2s ease;
+}
+.btn:hover { filter: brightness(1.05); }
+.btn:active { transform: translateY(1px); }
+.btn.secondary {
+  background: #1a2233; color: var(--ink);
+  border: 1px solid var(--border);
+  box-shadow: none;
+}
+.btn.success { background: var(--accent-2); color: #e7f2ec; }
+.btn.danger  { background: var(--danger); color: #fff; }
+a.button-link { text-decoration: none; }
+
+/* Focus states (a11y) */
+.btn:focus,
+.input:focus,
+select:focus,
+textarea:focus,
+a:focus {
+  outline: 2px solid transparent;
+  box-shadow: 0 0 0 3px var(--focus);
+}
+
+/* ------- Forms ------- */
+.field { margin-bottom: 14px; }
+label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+.input, select, textarea {
+  width: 100%;
+  background: #0a1220;
+  color: var(--ink);
+  border: 1px solid var(--border);
+  padding: 10px 12px;
+  border-radius: 10px;
+}
+textarea { resize: vertical; }
+
+/* Helper alerts */
+.notice {
+  padding: 12px;
+  background: #0f1a12;
+  border: 1px solid #213828;
+  border-radius: 10px;
+  color: #cde9d6;
+  margin: 12px 0;
+}
+.error {
+  padding: 12px;
+  background: #2a1010;
+  border: 1px solid #5a2626;
+  border-radius: 10px;
+  color: #ffd9d9;
+  margin: 12px 0;
+}
+
+/* ------- Tables ------- */
+.table { width: 100%; border-collapse: collapse; }
+.table th, .table td {
+  border-bottom: 1px solid var(--border);
+  padding: 10px;
+  text-align: left;
+  vertical-align: top;
+}
+.table th { color: var(--muted); font-weight: 600; }
+.badge {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  background: #151f33;
+  color: #d7dbe6;
+  border: 1px solid var(--border);
+}
+
+/* ------- Footer ------- */
+.footer {
+  text-align: center;
+  color: var(--muted);
+  margin-top: 28px;
+  font-size: 13px;
+}
+
+/* ------- Chat (DM) ------- */
+.chat-layout {
+  display: grid;
+  grid-template-columns: 300px 1fr;
+  gap: 16px;
+}
+@media (max-width: 900px) {
+  .chat-layout { grid-template-columns: 1fr; }
+  .chat-sidebar { order: 2; }
+  .chat-main { order: 1; }
+}
+.chat-sidebar-header {
+  display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 8px;
+}
+.chat-convs { display: flex; flex-direction: column; gap: 8px; max-height: 70vh; overflow: auto; }
+.chat-conv {
+  width: 100%; text-align: left; border: 1px solid var(--border);
+  background: #0a1220; color: var(--ink);
+  padding: 10px; border-radius: 10px; cursor: pointer;
+  transition: background .2s ease, border-color .2s ease;
+}
+.chat-conv:hover { background: #0d192b; border-color: #24385e; }
+.conv-name { font-weight: 600; }
+.conv-last { color: var(--muted); }
+
+.chat-thread-header {
+  display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px;
+}
+.thread-title { font-size: 18px; font-weight: 700; }
+
+.chat-thread {
+  height: 52vh; overflow: auto; padding: 8px;
+  border: 1px solid var(--border); border-radius: 12px;
+  background: #0a0f1a;
+}
+
+/* Bubbles */
+.bubble {
+  max-width: 78%;
+  padding: 10px 12px;
+  border-radius: 12px;
+  margin: 6px 0;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  box-shadow: var(--inner-hair);
+}
+.bubble.me {
+  margin-left: auto;
+  background: #1b2a4f;
+  border: 1px solid #26386a;
+}
+.bubble.them {
+  margin-right: auto;
+  background: #13271f;
+  border: 1px solid #1e3b30;
+}
+.bubble-subject { font-weight: 600; margin-bottom: 4px; }
+.bubble-meta { font-size: 12px; color: var(--muted); margin-top: 6px; }
+
+/* Composer */
+.chat-composer { margin-top: 10px; }
+.chat-composer.disabled { opacity: .6; pointer-events: none; }
+.chat-row { display: grid; grid-template-columns: 1fr 120px; gap: 8px; }
+.chat-input { min-height: 42px; }
+.chat-subject { margin-bottom: 8px; }
+
+.testimonial {
+  font-size: 16px;
+  line-height: 1.5;
+  font-style: italic;
+  color: var(--ink); /* use main text color */
+}
+.testimonial-author {
+  font-size: 14px;
+  color: var(--muted);
+}

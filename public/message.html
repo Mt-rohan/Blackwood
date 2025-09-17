@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Message — Co-Founder Match</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="brand">Co-Founder Match</div>
+      <div class="nav">
+        <a id="backLink" href="#">Back to Dashboard</a>
+      </div>
+    </div>
+
+    <h2>Send a message</h2>
+    <div id="msg"></div>
+
+    <div id="recipient" class="card" style="margin-bottom:16px;"></div>
+
+    <div class="card">
+      <form id="messageForm">
+        <div class="field">
+          <label for="subject">Subject</label>
+          <input id="subject" class="input" placeholder="Let’s connect?" required />
+        </div>
+        <div class="field">
+          <label for="body">Message</label>
+          <textarea id="body" rows="6" class="input" placeholder="Keep it short and friendly." required></textarea>
+        </div>
+        <button class="btn" type="submit">Send (Mock)</button>
+      </form>
+    </div>
+
+    <div class="footer">© 2025 Co-Founder Match — MVP</div>
+  </div>
+
+  <script>
+    const msg = document.getElementById('msg');
+    const recipientCard = document.getElementById('recipient');
+    const form = document.getElementById('messageForm');
+    const backLink = document.getElementById('backLink');
+
+    function getParam(name) {
+      const url = new URL(window.location.href);
+      return url.searchParams.get(name);
+    }
+    function showNotice(text, ok=true) {
+      msg.innerHTML = '<div class="' + (ok ? 'notice' : 'error') + '">' + text + '</div>';
+    }
+
+    async function apiGet(path) {
+      const token = getParam('token');
+      const url = path.includes('?') ? (path + '&token=' + encodeURIComponent(token)) : (path + '?token=' + encodeURIComponent(token));
+      const res = await fetch(url);
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || 'Request failed');
+      return data;
+    }
+
+    async function apiPost(path, body) {
+      const token = getParam('token');
+      const url = path + '?token=' + encodeURIComponent(token);
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || 'Request failed');
+      return data;
+    }
+
+    (async () => {
+      const token = getParam('token');
+      const to = getParam('to');
+      if (!token || !to) {
+        showNotice('Missing token or recipient. Go back to your dashboard.', false);
+        return;
+      }
+      backLink.href = '/dashboard.html?token=' + encodeURIComponent(token);
+
+      try {
+        const { user } = await apiGet('/api/users/' + encodeURIComponent(to));
+        recipientCard.innerHTML = `
+          <strong>To: ${user.name}</strong><br>
+          <span class="badge">${user.industry || '—'}</span>
+          <span class="badge">${user.role || '—'}</span>
+          <span class="badge">${user.commitment || '—'}</span><br>
+          <span class="small">Skills: ${user.skills || '—'}</span>
+        `;
+      } catch (e) {
+        showNotice(e.message, false);
+      }
+    })();
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const to = getParam('to');
+      try {
+        const data = await apiPost('/api/message', {
+          toUserId: to,
+          subject: document.getElementById('subject').value.trim(),
+          body: document.getElementById('body').value.trim()
+        });
+        showNotice('Message sent. You can return to your Dashboard using the link above.');
+        form.reset();
+      } catch (err) {
+        showNotice(err.message, false);
+      }
+    });
+  </script>
+</body>
+</html>

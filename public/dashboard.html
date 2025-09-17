@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Dashboard — Blackwood</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="brand">Blackwood</div>
+      <div class="nav">
+        <a id="inboxLink" href="#">Inbox</a>
+        <a id="myProfileLink" href="#">My Profile</a>
+        <a id="logoutLink" href="#">Logout</a>
+      </div>
+    </div>
+
+    <h2>Your suggested matches</h2>
+    <p class="small">Top 3 matches based on skills, industry, and commitment. Use <strong>Inbox</strong> to chat, or <strong>View Profile</strong> to see details (incl. LinkedIn).</p>
+    <div id="msg"></div>
+
+    <div id="meCard" class="card" style="display:none; margin-bottom:16px;"></div>
+
+    <div class="card">
+      <table class="table" id="matchTable">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Skills</th>
+            <th>Industry</th>
+            <th>Role</th>
+            <th>Commitment</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="matchBody"></tbody>
+      </table>
+    </div>
+
+    <div class="footer">© 2025 Blackwood</div>
+  </div>
+
+  <script>
+    const msg = document.getElementById('msg');
+    const meCard = document.getElementById('meCard');
+    const matchBody = document.getElementById('matchBody');
+    const inboxLink = document.getElementById('inboxLink');
+    const myProfileLink = document.getElementById('myProfileLink');
+    const logoutLink = document.getElementById('logoutLink');
+
+    function getToken() {
+      const url = new URL(window.location.href);
+      return url.searchParams.get('token');
+    }
+
+    // Fill header links with current token
+    (function () {
+      const t = getToken();
+      if (t) {
+        if (inboxLink) inboxLink.href = '/inbox.html?token=' + encodeURIComponent(t);
+        if (myProfileLink) myProfileLink.href = '/profile.html?token=' + encodeURIComponent(t);
+      }
+    })();
+
+    function showNotice(text, ok=true) {
+      msg.innerHTML = '<div class="' + (ok ? 'notice' : 'error') + '">' + text + '</div>';
+    }
+
+    async function api(path) {
+      const token = getToken();
+      const url = path.includes('?') ? (path + '&token=' + encodeURIComponent(token)) : (path + '?token=' + encodeURIComponent(token));
+      const res = await fetch(url);
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || 'Request failed');
+      return data;
+    }
+
+    async function loadMe() {
+      try {
+        const data = await api('/api/me');
+        const u = data.user;
+        meCard.style.display = 'block';
+        meCard.innerHTML = `
+          <strong>Signed in as:</strong> ${u.name} <span class="small">(${u.email})</span><br>
+          <span class="badge">${u.industry || '—'}</span>
+          <span class="badge">${u.role || '—'}</span>
+          <span class="badge">${u.commitment || '—'}</span><br>
+          <span class="small">Skills: ${u.skills || '—'}</span>
+          ${u.linkedin ? `<div class="small" style="margin-top:4px;">LinkedIn: <a href="${u.linkedin}" target="_blank" rel="noreferrer">${u.linkedin}</a></div>` : ''}
+        `;
+      } catch (e) {
+        showNotice(e.message, false);
+      }
+    }
+
+    async function loadMatches() {
+      try {
+        const data = await api('/api/matches');
+        const matches = data.matches;
+        matchBody.innerHTML = '';
+        if (!matches.length) {
+          matchBody.innerHTML = '<tr><td colspan="6" class="small">No matches yet. Share your dashboard link after a few more users sign up.</td></tr>';
+          return;
+        }
+        const token = getToken();
+        for (const m of matches) {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td>${m.name}</td>
+            <td>${m.skills || '—'}</td>
+            <td>${m.industry || '—'}</td>
+            <td>${m.role || '—'}</td>
+            <td>${m.commitment || '—'}</td>
+            <td style="display:flex; gap:8px; flex-wrap:wrap;">
+              <a class="button-link" href="/profile.html?id=${encodeURIComponent(m.id)}&token=${encodeURIComponent(token)}">
+                <button class="btn">View Profile</button>
+              </a>
+              <a class="button-link" href="/message.html?to=${encodeURIComponent(m.id)}&token=${encodeURIComponent(token)}">
+                <button class="btn secondary">Message</button>
+              </a>
+            </td>
+          `;
+          matchBody.appendChild(tr);
+        }
+      } catch (e) {
+        showNotice(e.message, false);
+      }
+    }
+
+    logoutLink.addEventListener('click', (e) => {
+      e.preventDefault();
+      window.location.href = '/';
+    });
+
+    // Init
+    (async () => {
+      const t = getToken();
+      if (!t) {
+        showNotice('Missing token. Please sign up or login again.', false);
+        return;
+      }
+      await loadMe();
+      await loadMatches();
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Profile — Blackwood</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="brand">Blackwood</div>
+      <div class="nav">
+        <a id="backLink" href="/">Home</a>
+      </div>
+    </div>
+
+    <h2 id="title">Profile</h2>
+    <div id="msg"></div>
+
+    <div id="viewCard" class="card" style="margin-bottom:16px;"></div>
+
+    <div id="editCard" class="card" style="display:none;">
+      <h3>Edit Your Profile</h3>
+      <form id="editForm">
+        <div class="grid two">
+          <div class="field">
+            <label for="name">Full Name</label>
+            <input id="name" class="input" />
+          </div>
+          <div class="field">
+            <label for="linkedin">LinkedIn URL</label>
+            <input id="linkedin" class="input" placeholder="https://www.linkedin.com/in/your-handle" />
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="skills">Skills (comma-separated)</label>
+          <input id="skills" class="input" />
+        </div>
+
+        <div class="grid three">
+          <div class="field">
+            <label for="role">Desired Role</label>
+            <select id="role">
+              <option>Technical Founder</option>
+              <option>Product Founder</option>
+              <option>Business/GT-M Founder</option>
+              <option>Design Founder</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="industry">Startup Industry</label>
+            <select id="industry">
+              <option>AI</option>
+              <option>Fintech</option>
+              <option>Health</option>
+              <option>Consumer</option>
+              <option>DevTools</option>
+              <option>Climate</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="commitment">Commitment Level</label>
+            <select id="commitment">
+              <option>Exploring</option>
+              <option>Nights & Weekends</option>
+              <option>Full-time</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="grid two">
+          <div class="field">
+            <label for="teamTech"># Technical teammates</label>
+            <input id="teamTech" class="input" type="number" min="0" step="1" />
+          </div>
+          <div class="field">
+            <label for="teamBiz"># Business/GT-M teammates</label>
+            <input id="teamBiz" class="input" type="number" min="0" step="1" />
+          </div>
+        </div>
+
+        <button class="btn" type="submit">Save</button>
+        <button class="btn secondary" id="cancelBtn" type="button">Cancel</button>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    const msg = document.getElementById('msg');
+    const title = document.getElementById('title');
+    const viewCard = document.getElementById('viewCard');
+    const editCard = document.getElementById('editCard');
+    const editForm = document.getElementById('editForm');
+    const backLink = document.getElementById('backLink');
+
+    function show(text, ok=true) {
+      msg.innerHTML = '<div class="'+(ok?'notice':'error')+'">'+text+'</div>';
+    }
+    function getParam(name) {
+      const u = new URL(location.href);
+      return u.searchParams.get(name);
+    }
+    function token() { return getParam('token'); }
+
+    async function apiGet(path) {
+      const t = token();
+      const url = t ? (path + (path.includes('?') ? '&' : '?') + 'token=' + encodeURIComponent(t)) : path;
+      const res = await fetch(url);
+      return res.json();
+    }
+    async function apiPut(path, body) {
+      const t = token();
+      const url = path + '?token=' + encodeURIComponent(t);
+      const res = await fetch(url, { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
+      return res.json();
+    }
+
+    function renderView(u, isMe) {
+      const lk = u.linkedin ? `<a href="${u.linkedin}" target="_blank" rel="noreferrer" class="btn" style="text-decoration:none;">LinkedIn</a>` : '<span class="small muted">No LinkedIn yet</span>';
+      viewCard.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <div>
+            <h3 style="margin:0">${u.name}</h3>
+            <div class="small">${u.role || '—'} · ${u.industry || '—'} · ${u.commitment || '—'}</div>
+          </div>
+          <div>${lk}</div>
+        </div>
+        <div class="small" style="margin-top:8px;">Skills: ${u.skills || '—'}</div>
+        <div class="small" style="margin-top:4px;">Team: ${u.teamTech ?? 0} technical · ${u.teamBiz ?? 0} business</div>
+        ${isMe ? '<div style="margin-top:12px;"><button id="editBtn" class="btn secondary">Edit Profile</button></div>' : ''}
+      `;
+      if (isMe) {
+        document.getElementById('editBtn').addEventListener('click', () => openEdit(u));
+      }
+    }
+
+    function fillEdit(u) {
+      document.getElementById('name').value = u.name || '';
+      document.getElementById('linkedin').value = u.linkedin || '';
+      document.getElementById('skills').value = u.skills || '';
+      document.getElementById('role').value = u.role || 'Technical Founder';
+      document.getElementById('industry').value = u.industry || 'AI';
+      document.getElementById('commitment').value = u.commitment || 'Exploring';
+      document.getElementById('teamTech').value = u.teamTech ?? 0;
+      document.getElementById('teamBiz').value = u.teamBiz ?? 0;
+    }
+
+    function openEdit(u) {
+      fillEdit(u);
+      editCard.style.display = 'block';
+      show('', true);
+    }
+
+    (async () => {
+      const id = getParam('id'); // profileId to view (optional)
+      const t = token();
+      if (t) backLink.href = '/dashboard.html?token=' + encodeURIComponent(t);
+
+      let me = null;
+      if (t) {
+        const meRes = await apiGet('/api/me');
+        if (meRes.ok) me = meRes.user;
+      }
+
+      if (id) {
+        // Viewing someone by ID (public view)
+        const res = await apiGet('/api/users/' + encodeURIComponent(id));
+        if (!res.ok) { show(res.error || 'User not found', false); return; }
+        const u = res.user;
+        title.textContent = `${u.name} — Profile`;
+        renderView(u, me && me.id === u.id);
+      } else if (me) {
+        // Viewing own profile by token
+        title.textContent = `My Profile`;
+        renderView(me, true);
+      } else {
+        show('Missing token or user id. Open from Dashboard or pass ?id=<userId>.', false);
+      }
+    })();
+
+    editForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const body = {
+        name: document.getElementById('name').value.trim(),
+        linkedin: document.getElementById('linkedin').value.trim(),
+        skills: document.getElementById('skills').value.trim(),
+        role: document.getElementById('role').value,
+        industry: document.getElementById('industry').value,
+        commitment: document.getElementById('commitment').value,
+        teamTech: document.getElementById('teamTech').value,
+        teamBiz: document.getElementById('teamBiz').value
+      };
+      const res = await apiPut('/api/profile', body);
+      if (!res.ok) { show(res.error || 'Failed to save', false); return; }
+      show('Saved!');
+      editCard.style.display = 'none';
+      // Re-render view with updated user
+      renderView(res.user, true);
+    });
+
+    document.getElementById('cancelBtn').addEventListener('click', () => {
+      editCard.style.display = 'none';
+    });
+  </script>
+</body>
+</html>
